@@ -20,10 +20,10 @@ struct globalArguments_t
 
 void defaultGlobalArguments()
 {
-	globalArguments.host = NULL;
-	globalArguments.port = NULL;
-	globalArguments.channel = NULL;
-	globalArguments.nick = NULL;
+	globalArguments.host = "twice-irc.de";
+	globalArguments.port = "6667";
+	globalArguments.channel = "#finf";
+	globalArguments.nick = "myBot";
 }
 
 // In case the user don't want the default globalArguments the var will be read in the console
@@ -68,7 +68,14 @@ void ShowArguments()
 int main (int argc, char * argv[]) 
 {
 	defaultGlobalArguments();
-	SetArguments(argc, argv);
+	if (argc == 9)
+	{
+		SetArguments(argc, argv);
+	}
+	else
+	{
+		printf("Using default Vaules to connect\n");
+	}
 	ShowArguments();
 
 	return 0;
