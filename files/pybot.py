@@ -54,6 +54,31 @@ def handle_message(s, data):
 		msg = "PRIVMSG %s :pong!\r\n" % irc["channel"]
 		send_msg(s, msg)
 
+	if ("PRIVMSG %s :%s" % (irc["channel"], irc["nick"])) in data:
+		msg = "PRIVMSG %s :Hello I'm an IRC Bot made by IBoehmer\r\n" % irc["channel"]
+		send_msg(s, msg) 
+	if ("PRIVMSG %s :-q" % irc["channel"]) in data:
+		msg = "PRIVMSG %s :Your sure I should quit [j/n]\r\n" % irc["channel"]
+		send_msg(s, msg)
+
+		while msg:
+			answer = raw_input("j/n")
+
+			if (answer == ("PRIVMSG %s :j" % irc["channel"])):
+				msg_state = "%s :Disconnecting...\r\n" % irc["channel"]
+				send_msg(s, msg_state)
+				s.close()
+				return(0)
+			elif (answer == ("PRIVMSG %s :n" % irc["channel"])):
+				msg_state = "PRIVMSG %s :Ok, I stay\r\n" % irc["channel"]
+				send_msg(s, msg_state)
+				break;
+			else:
+				msg_state = "PRIVMSG %s :Could not read answer\r\n" % irc["channel"]
+				send_msg(s, msg_state)
+				break;
+		
+
 def send_msg(s, msg):
 	s.send(bytes("%s" % (msg)))
 
