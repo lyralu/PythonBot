@@ -3,20 +3,24 @@
 from sqlite3 import dbapi2 as sqlite
 from time import sleep
 from sys import exit
+import time, datetime
 import sys, getopt
+import string
 import os
 import socket
 
 irc = { "host": "localhost", "port": "6667", "nick": "myBot", "server": "localhost", "channel": "#test"}
+irc_msg = { "time": " ", "channel": " ", "user": " ", "message": " "}
 
 
-def connect_irc(irc):
+def connect_irc(irc, cursor, logging):
 	try:		
 		for i in socket.getaddrinfo(irc["host"],irc["port"], socket.AF_UNSPEC, socket.SOCK_STREAM):
 			af, socktype, proto, canonname, sa = i
 			try:
 				s = socket.socket(af, socktype, proto)
 			except socket.error as msg:
+				s.close()
 				s= None
 				continue
 			try:
@@ -33,7 +37,7 @@ def connect_irc(irc):
 			data = s.recv(1024).decode("utf-8")
 			if data:
 				print(data)
-				handle_message(s, data)
+				handle_message(s, data, cursor, logging)
 			else:
 				break
 
@@ -46,17 +50,46 @@ def connect_channel(s, irc):
 	s.send(bytes('USER %s %s pyBot : %s\r\n' % (irc["nick"], irc["host"], irc["nick"])))
 	s.send(bytes('JOIN %s\r\n' % (irc["channel"])))
 
-def handle_message(s, data):
-	if "PING " in data:
+def handle_message(s, data, cursor, logging):
+	full_msg = string.split(data)
+	irc_msg["message"] = " ".join(full_msg[3:])
+	irc_msg["user"] = full_msg[0].split("!")
+	irc_msg["user"] = irc_msg["user"][0].replace(":", "")
+	irc_msg["time"] = time.time()
+	irc_msg["channel"] = irc["channel"]
+ 
+	print("Logging: %s" % logging)	
+	if logging:
+		logDB(irc_msg, cursor)
+	
+	if full_msg[0] == "PING":
 		msg = "PONG"
 		send_msg(s, msg)
-
-	if "PRIVMSG %s :!ping" % irc["channel"] in data:
-		msg = "PRIVMSG %s :pong!\r\n" % irc["channel"]
+	if full_msg[1] == "JOIN" and irc_msg["user"] != irc["nick"]:
+		msg = ("PRIVMSG "+irc_msg["user"]+ " :Welcome\r\n")
 		send_msg(s, msg)
+	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"]:
+		if "!ping" in irc_msg["message"]:
+			msg = ("PRIVMSG "+irc["channel"]+ " :pong!\r\n")
+			send_msg(s, msg)
+		if ("Show log") in irc_msg["message"]:
+			selectFrom_table(s, cursor)
+			
+	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"] and irc["nick"] in irc_msg["message"]:
+		if ("Help") in irc_msg["message"]:
+			commands(s, irc_msg, irc)
+		if " log" in irc_msg["message"]:
+			logging = True
+			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log activated\r\n")
+			send_msg(s, msg) 
+		if " !log" in irc_msg["message"]:
+			logging = False
+			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log deactivated\r\n")
+			send_msg(s, msg) 
+'''	
+	log(data, cursor, logging)
 
-	if ("PRIVMSG %s :%s" % (irc["channel"], irc["nick"])) in data:
-		msg = "PRIVMSG %s :Hello I'm an IRC Bot made by IBoehmer\r\n" % irc["channel"]
+	
 		send_msg(s, msg) 
 	if ("PRIVMSG %s :-q" % irc["channel"]) in data:
 		msg = "PRIVMSG %s :Your sure I should quit [j/n]\r\n" % irc["channel"]
@@ -79,12 +112,27 @@ def handle_message(s, data):
 				send_msg(s, msg_state)
 				break;
 		
+'''	
 
 def send_msg(s, msg):
 	s.send(bytes("%s" % (msg)))
 
 	if __debug__:
 		print(msg)
+
+def commands(s, irc_msg, irc):
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" log - Activates chat log\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" !log - Deactivates chat log\r\n"))
+
+def logDB(irc_msg, cursor):
+		if __debug__:
+			print("Insert into database")
+		insert_table(cursor, irc_msg)
+		
+		cursor.execute("SELECT * FROM CompleteChat")
+		print("the database now contains:")
+		for row in cursor:
+			print row
 
 #***********Command line parameters********
 def GetArguments(irc, argv):
@@ -135,7 +183,18 @@ def connect_db(connection):
 		return cursor
 
 def create_table(cursor):
-	cursor.execute('''CREATE TABLE IF NOT EXISTS logging(timestamp DATE, line TEXT)''')
+	cursor.execute("CREATE TABLE IF NOT EXISTS CompleteChat(Time TIMESTAMP, Channel TEXT, User TEXT, Message TEXT)")
+
+def insert_table(cursor, irc_msg):
+	cursor.execute("INSERT INTO CompleteChat VALUES (?,?,?,?)", (irc_msg["time"], irc_msg["channel"], irc_msg["user"], irc_msg["message"]))
+
+def selectFrom_table(s, cursor):
+	cursor.execute("SELECT Min(User) FROM CompleteChat ")
+	user = cursor.fetchone()
+	#send_msg(s, "PRIVMSG "+irc_msg["channel"]+ " : Last User:" +user[0][0]+"\r\n")
+	print (user[0][0])
+		
+	
 	
 def close_db(connection, cursor):
 	cursor.close()
@@ -145,13 +204,17 @@ def close_db(connection, cursor):
 #**************Main**************
 
 def main():
+	#at the beginning chat log is turned off
+	logging = False
+	#if the user dos not give any command line parameters the default values will be used
 	if sys.argv > 1:	
 		GetArguments(irc, sys.argv[1:])
 	connection = create_db_connection()
 	cursor = connect_db(connection)
 	create_table(cursor)
+	connect_irc(irc, cursor, logging)
 	close_db(connection, cursor)
-	connect_irc(irc)
+	
 
 if __name__ == "__main__":
 	main()
