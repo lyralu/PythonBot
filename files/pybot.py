@@ -3,6 +3,7 @@
 from sqlite3 import dbapi2 as sqlite
 from time import sleep
 from sys import exit
+import sys, getopt
 import os
 import socket
 
@@ -85,6 +86,26 @@ def send_msg(s, msg):
 	if __debug__:
 		print(msg)
 
+#***********Command line parameters********
+def GetArguments(irc, argv):
+	try:
+		opts, args = getopt.getopt(argv, "h:c:n:", ["host=", "channel=", "nick="])
+	except getopt.GetoptError:
+		print ("Use: pybot.py -h <host> -c <channel> -n <nick>")
+		exit(1)
+	
+	for opt, arg in opts:
+		if opt in ("-h", "--host"):
+			irc["host"] = arg
+		elif opt in ("-c", "--channel"):
+			irc["channel"] = arg
+		elif opt in ("-n", "--nick"):
+			irc["nick"] = arg
+	
+	print("Value change successful")
+			
+
+
 #**************SQLite**************
 
 def create_db_connection():
@@ -124,6 +145,8 @@ def close_db(connection, cursor):
 #**************Main**************
 
 def main():
+	if sys.argv > 1:	
+		GetArguments(irc, sys.argv[1:])
 	connection = create_db_connection()
 	cursor = connect_db(connection)
 	create_table(cursor)
