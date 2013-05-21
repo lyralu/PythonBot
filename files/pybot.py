@@ -13,7 +13,7 @@ irc = { "host": "localhost", "port": "6667", "nick": "myBot", "server": "localho
 irc_msg = { "time": " ", "channel": " ", "user": " ", "message": " "}
 logging = False
 
-def connect_irc(irc, cursor):
+def connect_irc(irc, connection, cursor):
 	try:		
 		for i in socket.getaddrinfo(irc["host"],irc["port"], socket.AF_UNSPEC, socket.SOCK_STREAM):
 			af, socktype, proto, canonname, sa = i
@@ -37,20 +37,24 @@ def connect_irc(irc, cursor):
 			data = s.recv(1024).decode("utf-8")
 			if data:
 				print(data)
-				handle_message(s, data, cursor)
+				handle_message(s, data, connection, cursor)
 			else:
 				break
 
 	except KeyboardInterrupt:
-		s.close()
-		exit(1)
+		close_irc(s, connection, cursor)
 
 def connect_channel(s, irc):
 	s.send(bytes('NICK %s\r\n' % irc["nick"]))
 	s.send(bytes('USER %s %s pyBot : %s\r\n' % (irc["nick"], irc["host"], irc["nick"])))
 	s.send(bytes('JOIN %s\r\n' % (irc["channel"])))
 
-def handle_message(s, data, cursor):
+def close_irc(s, connection, cursor):
+	close_db(connection, cursor)
+	s.close()
+	exit(0)
+
+def handle_message(s, data, connection, cursor):
 	full_msg = string.split(data)
 	irc_msg["message"] = " ".join(full_msg[3:])
 	irc_msg["user"] = full_msg[0].split("!")
@@ -98,14 +102,16 @@ def handle_message(s, data, cursor):
 			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log deactivated\r\n")
 			send_msg(s, msg) 
 		if ("show log") in irc_msg["message"]:
-			selectAll(s, cursor)
+			selectAll(s, cursor, irc_msg["channel"])
 		if ("show user") in irc_msg["message"]:
 			selectUser(s, cursor, irc_msg)
+		if("show last action") in irc_msg["message"]:
+			selectLastAction(s, cursor, irc_msg["channel"])
+		if ("quit") in irc_msg["message"]:
+			send_msg(s, ("PRIVMSG "+irc["channel"]+ " :Bye!\r\n"))
+			close_irc(s, connection, cursor)
+			
 '''	
-
-	if ("PRIVMSG %s :-q" % irc["channel"]) in data:
-		msg = "PRIVMSG %s :Your sure I should quit [j/n]\r\n" % irc["channel"]
-		send_msg(s, msg)
 
 		while msg:
 			answer = raw_input("j/n")
@@ -137,6 +143,7 @@ def commands(s, irc_msg, irc):
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" do not log - Deactivates chat log\r\n"))
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show log - Shows complete log of the channel\r\n"))
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show user - Shows last user in the log\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show last action - Shows last action from the channel\r\n"))
 
 def HandleLogging(value):
 	global logging
@@ -208,16 +215,14 @@ def connect_db(connection):
 		return cursor
 
 def create_table(cursor):
-	cursor.execute("CREATE TABLE IF NOT EXISTS CompleteChat(Time TIMESTAMP, Channel TEXT, User TEXT, Message TEXT)")
+	cursor.execute("CREATE TABLE IF NOT EXISTS CompleteChat(TimeSt TIMESTAMP, Channel TEXT, User TEXT, Message TEXT)")
 
 def insert_table(cursor, irc_msg):
 	cursor.execute("INSERT INTO CompleteChat VALUES (?,?,?,?)", (irc_msg["time"], irc_msg["channel"], irc_msg["user"], irc_msg["message"]))
 
-def selectAll(s, cursor):
-	cursor.execute("SELECT * FROM CompleteChat")
-	#if cursor == null:
-	#	send_msg(s, "PRIVMSG "+ channel+ " :Sorry log is empty.\r\n")
-
+def selectAll(s, cursor, channel):
+	results = cursor.execute("SELECT * FROM CompleteChat")
+	
 	for row in cursor:
 		timestp = row[0]
 		time = datetime.datetime.fromtimestamp(timestp).strftime("[%Y-%m-%d %H:%M:%S]")
@@ -225,12 +230,25 @@ def selectAll(s, cursor):
 		user = row[2]
 		message = row[3]
 		send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
+	
 
 def selectUser(s, cursor, irc_msg):
-	cursor.execute("SELECT max(User) FROM CompleteChat")
-	max_user = cursor.fetchone()[0]
-	send_msg(s, "PRIVMSG "+ irc_msg["channel"]+" :Last user in log: "+max_user+"\r\n")
-		
+	cursor.execute("SELECT max(TimeSt), User FROM CompleteChat")
+	max_user = cursor.fetchone()[1]
+	if max_user is not None:
+		send_msg(s, "PRIVMSG "+ irc_msg["channel"]+ " :Last action from user: "+max_user+"\r\n")
+	else:
+		send_msg(s, "PRIVMSG "+ irc_msg["channel"]+ " :Sorry log is empty\r\n")
+
+def selectLastAction(s, cursor, channel):
+	cursor.execute("SELECT max(TimeSt), User, Message FROM CompleteChat WHERE Channel = '%s'" % channel)
+
+	for row in cursor:	
+		timestp = row[0]
+		time = datetime.datetime.fromtimestamp(timestp).strftime("[%Y-%m-%d %H:%M:%S]")
+		user = row[1]
+		message = row[2]
+		send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
 	
 	
 def close_db(connection, cursor):
@@ -247,8 +265,8 @@ def main():
 	connection = create_db_connection()
 	cursor = connect_db(connection)
 	create_table(cursor)
-	connect_irc(irc, cursor)
-	close_db(connection, cursor)
+	connect_irc(irc, connection, cursor)
+
 	
 
 if __name__ == "__main__":
