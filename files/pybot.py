@@ -221,15 +221,21 @@ def insert_table(cursor, irc_msg):
 	cursor.execute("INSERT INTO CompleteChat VALUES (?,?,?,?)", (irc_msg["time"], irc_msg["channel"], irc_msg["user"], irc_msg["message"]))
 
 def selectAll(s, cursor, channel):
-	results = cursor.execute("SELECT * FROM CompleteChat")
-	
-	for row in cursor:
-		timestp = row[0]
-		time = datetime.datetime.fromtimestamp(timestp).strftime("[%Y-%m-%d %H:%M:%S]")
-		channel = row[1]
-		user = row[2]
-		message = row[3]
-		send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
+	cursor.execute("SELECT * FROM CompleteChat")
+	#fetchall gives a list of tuple e.g. [(u'12:15', u'#test', u'myNick', u':Hi'), (u'12:45', u'#test'....)]
+	result = cursor.fetchall()
+	#if the table is not empty print the log
+	if result:
+		for x in result:
+			timestp = x[0]
+			time = datetime.datetime.fromtimestamp(timestp).strftime("[%Y-%m-%d %H:%M:%S]")
+			channel = x[1]
+			user = x[2]
+			message = x[3]
+			send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
+	else:
+		send_msg(s, "PRIVMSG "+ channel+ " :Sorry log is empty\r\n")
+
 	
 
 def selectUser(s, cursor, irc_msg):
@@ -242,13 +248,18 @@ def selectUser(s, cursor, irc_msg):
 
 def selectLastAction(s, cursor, channel):
 	cursor.execute("SELECT max(TimeSt), User, Message FROM CompleteChat WHERE Channel = '%s'" % channel)
-
-	for row in cursor:	
-		timestp = row[0]
+	#fetchone gives one tuple back
+	result = cursor.fetchone()
+	#if the table is empty fetchone will return None
+	if result[0] is not None:
+		timestp = result[0]
 		time = datetime.datetime.fromtimestamp(timestp).strftime("[%Y-%m-%d %H:%M:%S]")
-		user = row[1]
-		message = row[2]
+		user = result[1]
+		message = result[2]
 		send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
+	else:
+		send_msg(s, "PRIVMSG "+ channel+ " :Sorry log is empty\r\n")
+
 	
 	
 def close_db(connection, cursor):
