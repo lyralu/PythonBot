@@ -11,9 +11,9 @@ import socket
 
 irc = { "host": "localhost", "port": "6667", "nick": "myBot", "server": "localhost", "channel": "#test"}
 irc_msg = { "time": " ", "channel": " ", "user": " ", "message": " "}
+logging = False
 
-
-def connect_irc(irc, cursor, logging):
+def connect_irc(irc, cursor):
 	try:		
 		for i in socket.getaddrinfo(irc["host"],irc["port"], socket.AF_UNSPEC, socket.SOCK_STREAM):
 			af, socktype, proto, canonname, sa = i
@@ -37,7 +37,7 @@ def connect_irc(irc, cursor, logging):
 			data = s.recv(1024).decode("utf-8")
 			if data:
 				print(data)
-				handle_message(s, data, cursor, logging)
+				handle_message(s, data, cursor)
 			else:
 				break
 
@@ -50,25 +50,29 @@ def connect_channel(s, irc):
 	s.send(bytes('USER %s %s pyBot : %s\r\n' % (irc["nick"], irc["host"], irc["nick"])))
 	s.send(bytes('JOIN %s\r\n' % (irc["channel"])))
 
-def handle_message(s, data, cursor, logging):
+def handle_message(s, data, cursor):
 	full_msg = string.split(data)
 	irc_msg["message"] = " ".join(full_msg[3:])
 	irc_msg["user"] = full_msg[0].split("!")
 	irc_msg["user"] = irc_msg["user"][0].replace(":", "")
 	irc_msg["time"] = time.time()
 	irc_msg["channel"] = irc["channel"]
- 
-	print("Logging: %s" % logging)	
-	if logging:
-		logDB(irc_msg, cursor)
-	
+ 	
 	if full_msg[0] == "PING":
 		msg = "PONG"
 		send_msg(s, msg)
 	if full_msg[1] == "JOIN" and irc_msg["user"] != irc["nick"]:
 		msg = ("PRIVMSG "+irc_msg["user"]+ " :Welcome\r\n")
 		send_msg(s, msg)
+		
+		print("Logging: %s" % logging)	
+		if logging:
+			irc_msg["message"]= ("%s joined channel" % irc_msg["user"])
+			logDatabase(irc_msg, cursor)
 	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"]:
+		print("Logging: %s" % logging)	
+		if logging:
+			logDatabase(irc_msg, cursor)
 		if "!ping" in irc_msg["message"]:
 			msg = ("PRIVMSG "+irc["channel"]+ " :pong!\r\n")
 			send_msg(s, msg)
@@ -79,18 +83,16 @@ def handle_message(s, data, cursor, logging):
 		if ("Help") in irc_msg["message"]:
 			commands(s, irc_msg, irc)
 		if " log" in irc_msg["message"]:
-			logging = True
+			HandleLogging("true")
+			print("Logging: %s" % logging)	
 			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log activated\r\n")
 			send_msg(s, msg) 
 		if " !log" in irc_msg["message"]:
-			logging = False
+			HandleLogging("false")
 			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log deactivated\r\n")
 			send_msg(s, msg) 
 '''	
-	log(data, cursor, logging)
 
-	
-		send_msg(s, msg) 
 	if ("PRIVMSG %s :-q" % irc["channel"]) in data:
 		msg = "PRIVMSG %s :Your sure I should quit [j/n]\r\n" % irc["channel"]
 		send_msg(s, msg)
@@ -124,7 +126,18 @@ def commands(s, irc_msg, irc):
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" log - Activates chat log\r\n"))
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" !log - Deactivates chat log\r\n"))
 
-def logDB(irc_msg, cursor):
+def HandleLogging(value):
+	global logging
+	elif value == "true":
+		logging = True
+		print("Logging changed to %s" % logging)
+		return logging
+	else:
+		logging = False
+		print("Logging changed to %s" % logging)
+		return logging
+
+def logDatabase(irc_msg, cursor):
 		if __debug__:
 			print("Insert into database")
 		insert_table(cursor, irc_msg)
@@ -204,15 +217,13 @@ def close_db(connection, cursor):
 #**************Main**************
 
 def main():
-	#at the beginning chat log is turned off
-	logging = False
 	#if the user dos not give any command line parameters the default values will be used
 	if sys.argv > 1:	
 		GetArguments(irc, sys.argv[1:])
 	connection = create_db_connection()
 	cursor = connect_db(connection)
 	create_table(cursor)
-	connect_irc(irc, cursor, logging)
+	connect_irc(irc, cursor)
 	close_db(connection, cursor)
 	
 
