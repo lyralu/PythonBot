@@ -61,36 +61,46 @@ def handle_message(s, data, cursor):
 	if full_msg[0] == "PING":
 		msg = "PONG"
 		send_msg(s, msg)
+	#handling join
 	if full_msg[1] == "JOIN" and irc_msg["user"] != irc["nick"]:
-		msg = ("PRIVMSG "+irc_msg["user"]+ " :Welcome\r\n")
+		msg = ("PRIVMSG "+irc_msg["user"]+ " :Welcome "+irc_msg["user"]+"! Ask for '"+irc["nick"]+" Help' if you need any.\r\n")
 		send_msg(s, msg)
 		
 		print("Logging: %s" % logging)	
 		if logging:
-			irc_msg["message"]= ("%s joined channel" % irc_msg["user"])
+			irc_msg["message"]= (" joined the channel")
 			logDatabase(irc_msg, cursor)
-	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"]:
+	#handling if user leaves channel or quits
+	if (full_msg[1] == "PART" and irc_msg["user"] != irc["nick"]) or (full_msg[1] == "QUIT" and irc_msg["user"] != irc["nick"]):
+		if logging:
+			irc_msg["message"]= (" left the channel")
+			logDatabase(irc_msg, cursor)
+	#handling messages	
+	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"] and irc["nick"] not in irc_msg["message"]:
 		print("Logging: %s" % logging)	
 		if logging:
 			logDatabase(irc_msg, cursor)
 		if "!ping" in irc_msg["message"]:
 			msg = ("PRIVMSG "+irc["channel"]+ " :pong!\r\n")
 			send_msg(s, msg)
-		if ("Show log") in irc_msg["message"]:
-			selectFrom_table(s, cursor)
 			
-	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"] and irc["nick"] in irc_msg["message"]:
+	#commands to the bot	
+	if (full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"]) or (irc["nick"] in irc_msg["message"]):
 		if ("Help") in irc_msg["message"]:
 			commands(s, irc_msg, irc)
-		if " log" in irc_msg["message"]:
+		if "do log" in irc_msg["message"]:
 			HandleLogging("true")
 			print("Logging: %s" % logging)	
 			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log activated\r\n")
 			send_msg(s, msg) 
-		if " !log" in irc_msg["message"]:
+		if "do not log" in irc_msg["message"]:
 			HandleLogging("false")
 			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log deactivated\r\n")
 			send_msg(s, msg) 
+		if ("show log") in irc_msg["message"]:
+			selectAll(s, cursor)
+		if ("show user") in irc_msg["message"]:
+			selectUser(s, cursor, irc_msg)
 '''	
 
 	if ("PRIVMSG %s :-q" % irc["channel"]) in data:
@@ -123,12 +133,14 @@ def send_msg(s, msg):
 		print(msg)
 
 def commands(s, irc_msg, irc):
-	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" log - Activates chat log\r\n"))
-	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" !log - Deactivates chat log\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" do log - Activates chat log\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" do not log - Deactivates chat log\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show log - Shows complete log of the channel\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show user - Shows last user in the log\r\n"))
 
 def HandleLogging(value):
 	global logging
-	elif value == "true":
+	if value == "true":
 		logging = True
 		print("Logging changed to %s" % logging)
 		return logging
@@ -201,11 +213,23 @@ def create_table(cursor):
 def insert_table(cursor, irc_msg):
 	cursor.execute("INSERT INTO CompleteChat VALUES (?,?,?,?)", (irc_msg["time"], irc_msg["channel"], irc_msg["user"], irc_msg["message"]))
 
-def selectFrom_table(s, cursor):
-	cursor.execute("SELECT Min(User) FROM CompleteChat ")
-	user = cursor.fetchone()
-	#send_msg(s, "PRIVMSG "+irc_msg["channel"]+ " : Last User:" +user[0][0]+"\r\n")
-	print (user[0][0])
+def selectAll(s, cursor):
+	cursor.execute("SELECT * FROM CompleteChat")
+	#if cursor == null:
+	#	send_msg(s, "PRIVMSG "+ channel+ " :Sorry log is empty.\r\n")
+
+	for row in cursor:
+		timestp = row[0]
+		time = datetime.datetime.fromtimestamp(timestp).strftime("[%Y-%m-%d %H:%M:%S]")
+		channel = row[1]
+		user = row[2]
+		message = row[3]
+		send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
+
+def selectUser(s, cursor, irc_msg):
+	cursor.execute("SELECT max(User) FROM CompleteChat")
+	max_user = cursor.fetchone()[0]
+	send_msg(s, "PRIVMSG "+ irc_msg["channel"]+" :Last user in log: "+max_user+"\r\n")
 		
 	
 	
