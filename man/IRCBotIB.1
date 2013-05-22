@@ -1,0 +1,53 @@
+'\" t
+.\"     Title: ircbotib
+.\"    Author: [see the "AUTHOR" section]
+.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
+.\"      Date: 05/22/2013
+.\"    Manual: IRCBotIB Manual
+.\"    Source: IRCBotIB v0.1
+.\"  Language: English
+.\"
+.TH "IRCBOTIB" "1" "05/22/2013" "IRCBotIB v0\&.1" "IRCBotIB Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+IRCBotIB \- an Bot that can log IRC chats and fulfill commands
+.SH "SYNOPSIS"
+.sp
+IRCBotIB
+.SH "DESCRIPTION"
+.sp
+The IRC Bot can connect to any server or channel you want\&. While in the channel the other users can talk to the Bot and give him commands\&. One of the main functions is that the bot can log the full chat in a database\&.
+.SH "OPTIONS"
+.sp
+\-h <"host"> Overrides the default servervalue on which the bot connects
+.sp
+\-c <"#channel"> Overrides the default channel on which the bot connects
+.sp
+\-n <"nick"> Renames the Bot
+.SH "FILES"
+.sp
+log/sqlite\&.db \- is the database for the chat log
+.SH "AUTHOR"
+.sp
+Indra Boehmer
+.SH "COPYRIGHT AND LICENSE"
+.sp
+LICENSE TEXT

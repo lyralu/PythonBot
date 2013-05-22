@@ -1,0 +1,39 @@
+IRCBOTIB(1)
+===========
+Indra Boehmer <indra.boehmer@fh-heidelberg.de>
+v0.1, May 2013
+
+== NAME
+
+IRCBotIB - an Bot that can log IRC chats and fulfill commands
+
+== SYNOPSIS
+
+IRCBotIB
+
+== DESCRIPTION
+
+The IRC Bot can connect to any server or channel you want. While in the channel the other users can talk to the Bot and give him commands. One of the main functions is that the bot can log the full chat in a database.
+
+== OPTIONS
+
+*-h ["host"] 
+Overrides the default servervalue on which the bot connects
+
+*-c ["#channel"] 
+Overrides the default channel on which the bot connects
+
+*-n ["nick"] 
+Renames the Bot
+
+== FILES
+
+log/sqlite.db - is the database for the chat log
+
+== AUTHOR
+
+Indra Boehmer
+
+== COPYRIGHT AND LICENSE
+
+LICENSE TEXT 

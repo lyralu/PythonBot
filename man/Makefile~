@@ -1,0 +1,8 @@
+all: IRCBot_IB.1
+
+A2X?=a2x
+
+IRCBot_IB.1: asciidoc.conf IRCBot_IB.man
+	${A2X} -f manpage --verbose --asciidoc-opts="-f asciidoc.conf" IRCBot_IB.man
+clean:
+	rm -f IRCBot_IB.xml IRCBot_IB.1 IRCBot_IB.html
