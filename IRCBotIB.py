@@ -73,6 +73,7 @@ def handle_message(s, data, connection, cursor):
 		send_msg(s, msg)
 	#handling join
 	if full_msg[1] == "JOIN" and irc_msg["user"] != irc["nick"]:
+		addNewUser(cursor, irc_msg["time"], irc_msg["channel"], irc_msg["user"])
 		msg = ("PRIVMSG "+irc_msg["user"]+ " :Welcome "+irc_msg["user"]+"! Ask for '"+irc["nick"]+" Help' if you need any.\r\n")
 		send_msg(s, msg)
 		
@@ -81,9 +82,13 @@ def handle_message(s, data, connection, cursor):
 			irc_msg["message"]= (" joined the channel")
 			logDatabase(irc_msg, cursor)
 	#handling if user leaves channel or quits
-	if (full_msg[1] == "PART" and irc_msg["user"] != irc["nick"]) or (full_msg[1] == "QUIT" and irc_msg["user"] != irc["nick"]):
+	if full_msg[1] == "PART" and irc_msg["user"] != irc["nick"]:
 		if logging:
 			irc_msg["message"]= (" left the channel")
+			logDatabase(irc_msg, cursor)
+	if full_msg[1] == "QUIT" and irc_msg["user"] != irc["nick"]:
+		if logging:
+			irc_msg["message"]= (" left irc")
 			logDatabase(irc_msg, cursor)
 	#handling messages	
 	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"] and irc["nick"] not in irc_msg["message"]:
@@ -113,30 +118,14 @@ def handle_message(s, data, connection, cursor):
 			selectUser(s, cursor, irc_msg)
 		if("show last action") in irc_msg["message"]:
 			selectLastAction(s, cursor, irc_msg["channel"])
+		if("last seen = ") in irc_msg["message"]:
+			search_user = irc_msg["message"].split("=")
+			search_user = search_user[1].replace("=", "")
+			selectLastSeen(s, cursor, search_user, irc_msg["user"])
 		if ("quit") in irc_msg["message"]:
 			send_msg(s, ("PRIVMSG "+irc["channel"]+ " :Bye!\r\n"))
 			close_irc(s, connection, cursor)
-			
-'''	
-
-		while msg:
-			answer = raw_input("j/n")
-
-			if (answer == ("PRIVMSG %s :j" % irc["channel"])):
-				msg_state = "%s :Disconnecting...\r\n" % irc["channel"]
-				send_msg(s, msg_state)
-				s.close()
-				return(0)
-			elif (answer == ("PRIVMSG %s :n" % irc["channel"])):
-				msg_state = "PRIVMSG %s :Ok, I stay\r\n" % irc["channel"]
-				send_msg(s, msg_state)
-				break;
-			else:
-				msg_state = "PRIVMSG %s :Could not read answer\r\n" % irc["channel"]
-				send_msg(s, msg_state)
-				break;
-		
-'''	
+				
 
 def send_msg(s, msg):
 	s.send(bytes("%s" % (msg)))
@@ -150,6 +139,7 @@ def commands(s, irc_msg, irc):
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show log - Shows complete log of the channel\r\n"))
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show user - Shows last user in the log\r\n"))
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show last action - Shows last action from the channel\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" last seen =<usernick> - Shows when and on which channel the user join the last time (No Space between = and nick!!)\r\n"))
 
 def HandleLogging(value):
 	global logging
@@ -279,9 +269,16 @@ def connect_db(connection):
 
 def create_table(cursor):
 	cursor.execute("CREATE TABLE IF NOT EXISTS CompleteChat(TimeSt TIMESTAMP, Channel TEXT, User TEXT, Message TEXT)")
+	cursor.execute("CREATE TABLE IF NOT EXISTS AllUsers(TimeSt TIMESTAMP, Channel TEXT, User TEXT)")
 
 def insert_table(cursor, irc_msg):
 	cursor.execute("INSERT INTO CompleteChat VALUES (?,?,?,?)", (irc_msg["time"], irc_msg["channel"], irc_msg["user"], irc_msg["message"]))
+
+def insert_tableUser(cursor, time, channel, user):
+	cursor.execute("INSERT INTO AllUsers VALUES (?,?,?)", (time, channel, user))
+
+def update_tableUser(cursor, time, channel, user):
+	cursor.execute("UPDATE AllUsers SET TimeSt=?, Channel=? WHERE User=?", (time, channel, user))
 
 def selectAll(s, cursor, channel):
 	cursor.execute("SELECT * FROM CompleteChat")
@@ -323,6 +320,32 @@ def selectLastAction(s, cursor, channel):
 	else:
 		send_msg(s, "PRIVMSG "+ channel+ " :Sorry log is empty\r\n")
 
+def addNewUser(cursor, time, channel, user):
+	cursor.execute("SELECT User FROM AllUsers WHERE User= '%s'" % user)
+	result = cursor.fetchone()
+	#if there is a result the user is already in the database only the time and channel must be updated
+	if result is not None:
+		update_tableUser(cursor, time, channel, user)
+		print ("User update successful")
+		cursor.execute("SELECT * FROM AllUsers")
+		for row in cursor:
+			print row
+	else:
+		insert_tableUser(cursor, time, channel, user)
+		print ("User insert successful")
+		cursor.execute("SELECT * FROM AllUsers")
+		for row in cursor:
+			print row
+
+def selectLastSeen(s, cursor, user, sender):
+	cursor.execute("SELECT  TimeSt, Channel FROM AllUsers WHERE User = '%s'" % user)
+	result = cursor.fetchone()
+	if result is not None:
+		time = datetime.datetime.fromtimestamp(result[0]).strftime("[%Y-%m-%d %H:%M:%S]")
+		channel = result[1]
+		send_msg(s, "PRIVMSG "+ sender+ " :" +user+" was last seen: "+time+ " in Channel: " +channel+"\r\n")
+	else:
+		send_msg(s, "PRIVMSG "+ sender+ " :"+user+" is not in database!\r\n")
 	
 	
 def close_db(connection, cursor):
