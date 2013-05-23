@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, socket, string, getopt, time, datetime, ConfigParser
+import os, sys, socket, string, time, datetime, ConfigParser, optparse
 from sqlite3 import dbapi2 as sqlite
 from time import sleep
 from sys import exit
@@ -12,6 +12,7 @@ config.read("config.ini")
 irc = { "host": config.get("connect", "host"), "port": config.get("connect", "port"), "nick": config.get("connect", "nick"), "server": config.get("connect", "server"), "channel": config.get("connect", "channel")}
 irc_msg = { "time": " ", "channel": " ", "user": " ", "message": " "}
 logging = False
+
 
 def connect_irc(irc, connection, cursor):
 	try:		
@@ -31,7 +32,7 @@ def connect_irc(irc, connection, cursor):
 				continue
 			break
 		if s is None:
-			exit(1)
+			sys.exit(1)
 		connect_channel(s, irc)
 		while True:
 			data = s.recv(1024).decode("utf-8")
@@ -42,7 +43,8 @@ def connect_irc(irc, connection, cursor):
 				break
 
 	except KeyboardInterrupt:
-		close_irc(s, connection, cursor)
+		s.close()
+		sys.exit(1)
 
 def connect_channel(s, irc):
 	s.send(bytes('NICK %s\r\n' % irc["nick"]))
@@ -52,7 +54,11 @@ def connect_channel(s, irc):
 def close_irc(s, connection, cursor):
 	close_db(connection, cursor)
 	s.close()
-	exit(0)
+	pf = os.getpid()
+	os.kill(pf, SIGTERM)
+	sys.exit()
+
+#*********MessageHandeling*********
 
 def handle_message(s, data, connection, cursor):
 	full_msg = string.split(data)
@@ -167,23 +173,80 @@ def logDatabase(irc_msg, cursor):
 			print row
 
 #***********Command line parameters********
-def GetArguments(irc, argv):
-	try:
-		opts, args = getopt.getopt(argv, "h:c:n:", ["host=", "channel=", "nick="])
-	except getopt.GetoptError:
-		print ("Use: pybot.py -h <host> -c <channel> -n <nick>")
-		exit(1)
-	
-	for opt, arg in opts:
-		if opt in ("-h", "--host"):
-			irc["host"] = arg
-		elif opt in ("-c", "--channel"):
-			irc["channel"] = arg
-		elif opt in ("-n", "--nick"):
-			irc["nick"] = arg
-	
-	print("Value change successful")
-			
+def parse_options():
+	parser = optparse.OptionParser()
+
+	parser.add_option(
+		"-s", "--server",
+		action="store", default=irc["host"], dest="host",
+		help = "Set custom host/server")
+
+	parser.add_option(
+		"-c", "--channel",
+		action="store", default=irc["channel"], dest="channel",
+		help = "Set custom channel")
+
+	parser.add_option(
+		"-n", "--nick",
+		action="store", default=irc["nick"], dest="nick",
+		help = "Rename Bot")
+
+	parser.add_option(
+		"-d", "--daemon",
+		action="store_true", default=False, dest="daemon",
+		help = "Turn daemon mode on")
+
+	(opts, args) = parser.parse_args()
+
+	return opts, args
+
+#the parsed values from the consol overwrite the default values
+def SwitchValues(opts):
+	irc["host"] = opts.host
+	irc["channel"] = opts.channel
+	irc["nick"] = opts.nick
+
+	if opts.daemon:
+		daemonize()
+
+#******************Deamon***********
+
+def daemonize():
+	# Fork a child and end the parent (detach from parent)
+        try:
+            pid = os.fork()
+            if pid > 0:
+                sys.exit(0) # End parent
+        except OSError, e:
+            sys.stderr.write("First fork failed: %d (%s)\n" % (e.errno, e.strerror))
+            sys.exit(-2)
+
+        # Change some defaults so the daemon doesn't tie up dirs, etc.
+        os.setsid()
+        os.umask(0)
+
+        # Fork a child and end parent (so init now owns process)
+        try:
+            pid = os.fork()
+            if pid > 0:
+                try:
+                    f = file("IRCBotIB.pid", "w")
+                    f.write(str(pid))
+                    f.close()
+                except IOError, e:
+                    sys.stderr.write(repr(e))
+                sys.exit(0) # End parent
+        except OSError, e:
+            sys.stderr.write("Second fork failed: %d (%s)\n" % (e.errno, e.strerror))
+            sys.exit(-2)
+
+        # Close STDIN, STDOUT and STDERR so we don't tie up the controlling
+        # terminal
+        for fd in (0, 1, 2):
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
 
 #**************SQLite**************
@@ -271,12 +334,14 @@ def close_db(connection, cursor):
 
 def main():
 	#if the user dos not give any command line parameters the default values will be used
-	if sys.argv > 1:	
-		GetArguments(irc, sys.argv[1:])
+	if sys.argv > 1:
+		(opts, args) = parse_options()
+		SwitchValues(opts)
 	connection = create_db_connection()
 	cursor = connect_db(connection)
 	create_table(cursor)
 	connect_irc(irc, connection, cursor)
+
 
 	
 
