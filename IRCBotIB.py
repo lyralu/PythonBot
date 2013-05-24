@@ -47,9 +47,9 @@ def connect_irc(irc, connection, cursor):
 		sys.exit(1)
 
 def connect_channel(s, irc):
-	s.send(bytes('NICK %s\r\n' % irc["nick"]))
-	s.send(bytes('USER %s %s pyBot : %s\r\n' % (irc["nick"], irc["host"], irc["nick"])))
-	s.send(bytes('JOIN %s\r\n' % (irc["channel"])))
+	s.send(bytes("NICK %s\r\n" % irc["nick"]))
+	s.send(bytes("USER %s %s IRCBotIB : %s\r\n" % (irc["nick"], irc["host"], irc["nick"])))
+	s.send(bytes("JOIN %s\r\n" % (irc["channel"])))
 
 def close_irc(s, connection, cursor):
 	close_db(connection, cursor)
@@ -94,9 +94,14 @@ def handle_message(s, data, connection, cursor):
 		if logging:
 			irc_msg["message"]= (" left irc")
 			logDatabase(irc_msg, cursor)
+	if full_msg[1] == "TOPIC":
+		send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+ " :The current channel topic is"+irc_msg["message"]+"\r\n"))
 	
 	#handling the non commands to the bot
 	if full_msg[1] == "PRIVMSG" and irc["nick"] not in irc_msg["message"]:
+		print("Logging: %s" % logging)	
+		if logging:
+			logDatabase(irc_msg, cursor)
 		if "!ping" in irc_msg["message"]:
 			msg = ("PRIVMSG "+irc_msg["reciever"]+ " :pong!\r\n")
 			send_msg(s, msg)
@@ -138,7 +143,19 @@ def handle_message(s, data, connection, cursor):
 			if irc_msg["reciever"] != irc_msg["channel"]:
 				send_msg(s, ("PRIVMSG "+irc_msg["channel"]+ " :Bye!\r\n"))
 			close_irc(s, connection, cursor)
-				
+		#channel features
+		if ("topic") in irc_msg["message"]:
+			if ("set") in irc_msg["message"]:			
+				setTopic(s, irc_msg)
+			else:
+				s.send(bytes("TOPIC %s\r\n" % irc_msg["channel"]))
+		if ("change nick =") in irc_msg["message"]:
+			changeNick(s, irc_msg, irc)
+		if ("list user") in irc_msg["message"]:
+			s.send(bytes("NAMES %s\r\n" % (irc["channel"])))
+		if ("go to") in irc_msg["message"]:
+			changeChannel(s, irc_msg)
+
 
 def send_msg(s, msg):
 	s.send(bytes("%s" % (msg)))
@@ -153,6 +170,12 @@ def commands(s, irc_msg, irc):
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show user - Shows last user in the log\r\n"))
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show last action - Shows last action from the channel\r\n"))
 	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" last seen =<usernick> - Shows when and on which channel the user join the last time (No Space between = and nick!!)\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" show topic - Show the topic of the current channel\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" set topic =<newTopic> - Set a new topic for current channel (No Space between = and topic!!)\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" change nick =<newNick> - Change Bots nickname (No Space between = and topic!!)\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" got to =<#newChannel> - Bot switchs to other Channel (No Space between = and topic!!)\r\n"))
+	send_msg(s, ("PRIVMSG "+irc_msg["user"]+" :"+irc["nick"]+" quit - Bot leaves IRC\r\n"))
+
 
 def HandleLogging(value):
 	global logging
@@ -174,6 +197,38 @@ def logDatabase(irc_msg, cursor):
 		print("the database now contains:")
 		for row in cursor:
 			print row
+
+#************IRC Options*********************
+def setTopic(s, irc_msg):
+	topic = irc_msg["message"].split("=")
+	topic = topic[1].replace("= ", "")
+	s.send(bytes("TOPIC %s %s\r\n" % (irc_msg["channel"], topic)))
+	send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+ " : channel topic changed into:"+topic+"\r\n"))
+	if irc_msg["reciever"] != irc_msg["channel"]:
+		send_msg(s, ("PRIVMSG "+irc_msg["channel"]+ " : "+irc_msg["user"]+" changed channel topic into:"+topic+"\r\n"))
+
+def changeNick(s, irc_msg, irc):
+	newNick = irc_msg["message"].split("=")
+	newNick = newNick[1].replace("= ", "")
+	if len(newNick) < 2:
+		send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+ " :Nickname can only be one word!\r\n"))
+		pass
+	else:
+		irc["nick"] = newNick
+		s.send(bytes("NICK %s\r\n" % irc["nick"]))	
+
+def changeChannel(s, irc_msg):
+	newChannel = irc_msg["message"].split("=")
+	newChannel = newChannel[1].replace("= ", "")
+	if "#" in newChannel:
+		s.send(bytes("JOIN %s\r\n" % newChannel))
+		send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+ " :"+irc["nick"]+" is now in channel: "+newChannel+"\r\n"))
+		if irc_msg["reciever"] != irc_msg["channel"]:
+			send_msg(s, ("PRIVMSG "+irc_msg["channel"]+ " :"+irc["nick"]+" is now in channel: "+newChannel+"\r\n"))
+	else:
+		send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+ " :A Channel name must begin with a '#'\r\n"))
+		pass
+	
 
 #***********Command line parameters********
 def parse_options():
