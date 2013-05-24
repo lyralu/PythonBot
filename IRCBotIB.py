@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, socket, string, time, datetime, ConfigParser, optparse
+import os, sys, socket, string, time, datetime, ConfigParser, optparse, feedparser
 from sqlite3 import dbapi2 as sqlite
 from time import sleep
 from sys import exit
@@ -156,6 +156,15 @@ def handle_message(s, data, connection, cursor):
 			s.send(bytes("NAMES %s\r\n" % (irc["channel"])))
 		if ("go to") in irc_msg["message"]:
 			changeChannel(s, irc_msg)
+		if "rss" in irc_msg["message"]:
+			feed = irc_msg["message"].split("rss")
+			feed = feed[1].strip()
+			if feed == "nyt" or feed == "pcworld" or feed == "NASA":
+				send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+" :Connecting to RSS...\r\n"))
+				rssCall(s, irc_msg, feed)
+			else:
+				send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+" :Availabel RSS Feeds are: nty, pcworld or NASA\r\n"))
+ 
 
 
 def send_msg(s, msg):
@@ -435,6 +444,14 @@ def close_db(connection, cursor):
 	cursor.close()
 	connection.commit()
 	connection.close()
+
+#**********RSS Feeds************
+def rssCall(s, irc_msg, rss):
+	link = config.get("rss", rss)
+	rss = feedparser.parse(link)	
+	send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+" :RSS Feed "+rss["feed"]["title"]+": "+rss["entries"][0]["title"]+", Link: "+rss.entries[0]["link"]+"\r\n"))
+
+
 
 #**************Main**************
 
