@@ -2,12 +2,12 @@
 .\"     Title: ircbotib
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: 05/22/2013
+.\"      Date: 05/24/2013
 .\"    Manual: IRCBotIB Manual
 .\"    Source: IRCBotIB v0.1
 .\"  Language: English
 .\"
-.TH "IRCBOTIB" "1" "05/22/2013" "IRCBotIB v0\&.1" "IRCBotIB Manual"
+.TH "IRCBOTIB" "1" "05/24/2013" "IRCBotIB v0\&.1" "IRCBotIB Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -37,11 +37,157 @@ IRCBotIB
 The IRC Bot can connect to any server or channel you want\&. While in the channel the other users can talk to the Bot and give him commands\&. One of the main functions is that the bot can log the full chat in a database\&.
 .SH "OPTIONS"
 .sp
-\-h <"host"> Overrides the default servervalue on which the bot connects
+\-s <"server"> Overrides the default servervalue on which the bot connects
 .sp
 \-c <"#channel"> Overrides the default channel on which the bot connects
 .sp
 \-n <"nick"> Renames the Bot
+.sp
+\-d Start as daemon
+.SH "BOT COMMANDS"
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> help \- Sends this list to requester
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> do log \- Activates chat log
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> do not log \- Deactivates chat log
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> show log \- Shows complete log of the channel
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> show user \- Shows last user in the log
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> show last action \- Shows last action from the channel
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> last seen =<usernick> \- Shows when and on which channel the user join the last time (No Space between = and nick!!)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> show topic \- Show the topic of the current channel
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> set topic =<newTopic> \- Set a new topic for current channel (No Space between = and topic!!)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> change nick =<newNick> \- Change Bots nickname (No Space between = and topic!!)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> got to =<#newChannel> \- Bot switchs to other Channel (No Space between = and topic!!)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> rss <rssKey> \- Show the first entry and the link to an RSS Feed\&. rssKeys are: nyt, pcworld, NASA
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+<botNick> quit \- Bot leaves IRC
+.RE
 .SH "FILES"
 .sp
 log/sqlite\&.db \- is the database for the chat log
