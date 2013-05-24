@@ -11,8 +11,9 @@ config.read("config.ini")
 
 irc = { "host": config.get("connect", "host"), "port": config.get("connect", "port"), "nick": config.get("connect", "nick"), "server": config.get("connect", "server"), "channel": config.get("connect", "channel")}
 irc_msg = { "time": " ", "channel": " ", "user": " ", "message": " ", "reciever": " "}
-#logging = config.get("bot", "log")
-logging = False
+logging = config.getboolean("bot", "log")
+
+	
 
 def connect_irc(irc, connection, cursor):
 	try:		
@@ -252,8 +253,7 @@ def parse_options():
 	parser.add_option(
 		"-d", "--daemon",
 		action="store_true", 
-		#default= config.get("bot", "daemon"), 
-		default=False,
+		default= config.getboolean("bot", "daemon"), 
 		dest="daemon",
 		help = "Turn daemon mode on")
 
