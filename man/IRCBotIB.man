@@ -17,7 +17,7 @@ The IRC Bot can connect to any server or channel you want. While in the channel 
 
 == OPTIONS
 
--h <"host">
+-s <"server">
 Overrides the default servervalue on which the bot connects
 
 -c <"#channel"> 
@@ -25,6 +25,25 @@ Overrides the default channel on which the bot connects
 
 -n <"nick"> 
 Renames the Bot
+
+-d 
+Start as daemon
+
+== BOT COMMANDS
+
+- <botNick> help - Sends this list to requester
+- <botNick> do log - Activates chat log
+- <botNick> do not log - Deactivates chat log
+- <botNick> show log - Shows complete log of the channel
+- <botNick> show user - Shows last user in the log
+- <botNick> show last action - Shows last action from the channel
+- <botNick> last seen =<usernick> - Shows when and on which channel the user join the last time (No Space between = and nick!!)
+- <botNick> show topic - Show the topic of the current channel
+- <botNick> set topic =<newTopic> - Set a new topic for current channel (No Space between = and topic!!)
+- <botNick> change nick =<newNick> - Change Bots nickname (No Space between = and topic!!)
+- <botNick> got to =<#newChannel> - Bot switchs to other Channel (No Space between = and topic!!)
+- <botNick> rss <rssKey> - Show the first entry and the link to an RSS Feed. rssKeys are: nyt, pcworld, NASA
+- <botNick> quit - Bot leaves IRC
 
 == FILES
 
