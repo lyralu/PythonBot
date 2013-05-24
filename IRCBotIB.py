@@ -10,9 +10,9 @@ config = ConfigParser.ConfigParser()
 config.read("config.ini")
 
 irc = { "host": config.get("connect", "host"), "port": config.get("connect", "port"), "nick": config.get("connect", "nick"), "server": config.get("connect", "server"), "channel": config.get("connect", "channel")}
-irc_msg = { "time": " ", "channel": " ", "user": " ", "message": " "}
+irc_msg = { "time": " ", "channel": " ", "user": " ", "message": " ", "reciever": " "}
+#logging = config.get("bot", "log")
 logging = False
-
 
 def connect_irc(irc, connection, cursor):
 	try:		
@@ -54,8 +54,7 @@ def connect_channel(s, irc):
 def close_irc(s, connection, cursor):
 	close_db(connection, cursor)
 	s.close()
-	pf = os.getpid()
-	os.kill(pf, SIGTERM)
+	closeDaemon()
 	sys.exit()
 
 #*********MessageHandeling*********
@@ -65,8 +64,13 @@ def handle_message(s, data, connection, cursor):
 	irc_msg["message"] = " ".join(full_msg[3:])
 	irc_msg["user"] = full_msg[0].split("!")
 	irc_msg["user"] = irc_msg["user"][0].replace(":", "")
+	irc_msg["reciever"] = full_msg[2]
 	irc_msg["time"] = time.time()
 	irc_msg["channel"] = irc["channel"]
+	
+	#if the message wan't send in the general cahnnel it was a priavte msg from a user, he will be the reciever of the answer	
+	if irc_msg["reciever"] != irc_msg["channel"]:
+		irc_msg["reciever"] = irc_msg["user"]
  	
 	if full_msg[0] == "PING":
 		msg = "PONG"
@@ -90,40 +94,49 @@ def handle_message(s, data, connection, cursor):
 		if logging:
 			irc_msg["message"]= (" left irc")
 			logDatabase(irc_msg, cursor)
-	#handling messages	
-	if full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"] and irc["nick"] not in irc_msg["message"]:
-		print("Logging: %s" % logging)	
-		if logging:
-			logDatabase(irc_msg, cursor)
+	
+	#handling the non commands to the bot
+	if full_msg[1] == "PRIVMSG" and irc["nick"] not in irc_msg["message"]:
 		if "!ping" in irc_msg["message"]:
-			msg = ("PRIVMSG "+irc["channel"]+ " :pong!\r\n")
+			msg = ("PRIVMSG "+irc_msg["reciever"]+ " :pong!\r\n")
 			send_msg(s, msg)
+		if "hi" in irc_msg["message"] or "Hi" in irc_msg["message"]:
+			send_msg(s, "PRIVMSG "+irc_msg["reciever"]+ " :Hi whats up?\r\n")
+		if "hello" in irc_msg["message"] or "Hello" in irc_msg["message"]:
+			send_msg(s, "PRIVMSG "+irc_msg["reciever"]+ " :Hello how are you doing?\r\n")
+		if "Guten Tag" in irc_msg["message"] or "guten tag" in irc_msg["message"]:
+			send_msg(s, "PRIVMSG "+irc_msg["reciever"]+ " :Oh your german! Ihnen auch einen guten Tag!\r\n")
+		if "Talk to me" in irc_msg["message"]:
+			send_msg(s, "PRIVMSG "+irc_msg["reciever"]+ " :Sorry I'm only a prototype, I don't have so many features\r\n")
+	
 			
-	#commands to the bot	
-	if (full_msg[1] == "PRIVMSG" and full_msg[2] != irc["nick"]) or (irc["nick"] in irc_msg["message"]):
-		if ("Help") in irc_msg["message"]:
+	#commands to the bot: <botnick> <command>
+	if full_msg[1] == "PRIVMSG" or irc["nick"] in irc_msg["message"]:
+		if "Help" in irc_msg["message"] or ("help" in irc_msg["message"]):
 			commands(s, irc_msg, irc)
 		if "do log" in irc_msg["message"]:
 			HandleLogging("true")
 			print("Logging: %s" % logging)	
-			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log activated\r\n")
+			msg = ("PRIVMSG "+irc_msg["reciever"]+ " :Chat log activated\r\n")
 			send_msg(s, msg) 
 		if "do not log" in irc_msg["message"]:
 			HandleLogging("false")
-			msg = ("PRIVMSG "+irc["channel"]+ " :Chat log deactivated\r\n")
+			msg = ("PRIVMSG "+irc_msg["reciever"]+ " :Chat log deactivated\r\n")
 			send_msg(s, msg) 
 		if ("show log") in irc_msg["message"]:
-			selectAll(s, cursor, irc_msg["channel"])
+			selectAll(s, cursor, irc_msg)
 		if ("show user") in irc_msg["message"]:
 			selectUser(s, cursor, irc_msg)
 		if("show last action") in irc_msg["message"]:
-			selectLastAction(s, cursor, irc_msg["channel"])
-		if("last seen = ") in irc_msg["message"]:
+			selectLastAction(s, cursor, irc_msg)
+		if("last seen =") in irc_msg["message"]:
 			search_user = irc_msg["message"].split("=")
-			search_user = search_user[1].replace("=", "")
-			selectLastSeen(s, cursor, search_user, irc_msg["user"])
+			search_user = search_user[1].replace("= ", "")
+			selectLastSeen(s, cursor, search_user, irc_msg["reciever"])
 		if ("quit") in irc_msg["message"]:
-			send_msg(s, ("PRIVMSG "+irc["channel"]+ " :Bye!\r\n"))
+			send_msg(s, ("PRIVMSG "+irc_msg["reciever"]+ " :Bye!\r\n"))
+			if irc_msg["reciever"] != irc_msg["channel"]:
+				send_msg(s, ("PRIVMSG "+irc_msg["channel"]+ " :Bye!\r\n"))
 			close_irc(s, connection, cursor)
 				
 
@@ -183,7 +196,10 @@ def parse_options():
 
 	parser.add_option(
 		"-d", "--daemon",
-		action="store_true", default=False, dest="daemon",
+		action="store_true", 
+		#default= config.get("bot", "daemon"), 
+		default=False,
+		dest="daemon",
 		help = "Turn daemon mode on")
 
 	(opts, args) = parser.parse_args()
@@ -238,6 +254,24 @@ def daemonize():
             except OSError:
                 pass
 
+def closeDaemon():
+	pid = None
+	try:
+            f = file("IRCBotIB.pid", "r")
+            pid = int(f.readline())
+            f.close()
+            os.unlink("IRCBotIB.pid")
+        except ValueError, e:
+            sys.stderr.write("Error in pid file 'IRCBotIB.pid'. Aborting\n")
+            sys.exit(-1)
+        except IOError, e:
+            pass
+
+        if pid:
+            os.kill(pid, 15)
+        else:
+            sys.stderr.write("IRCBotIB not running or no PID file found\n")
+
 
 #**************SQLite**************
 
@@ -280,7 +314,7 @@ def insert_tableUser(cursor, time, channel, user):
 def update_tableUser(cursor, time, channel, user):
 	cursor.execute("UPDATE AllUsers SET TimeSt=?, Channel=? WHERE User=?", (time, channel, user))
 
-def selectAll(s, cursor, channel):
+def selectAll(s, cursor, irc_msg):
 	cursor.execute("SELECT * FROM CompleteChat")
 	#fetchall gives a list of tuple e.g. [(u'12:15', u'#test', u'myNick', u':Hi'), (u'12:45', u'#test'....)]
 	result = cursor.fetchall()
@@ -292,9 +326,9 @@ def selectAll(s, cursor, channel):
 			channel = x[1]
 			user = x[2]
 			message = x[3]
-			send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
+			send_msg(s, "PRIVMSG "+irc_msg["reciever"]+ " :" +time +user+message+"\r\n")
 	else:
-		send_msg(s, "PRIVMSG "+ channel+ " :Sorry log is empty\r\n")
+		send_msg(s, "PRIVMSG "+irc_msg["reciever"]+ " :Sorry log is empty\r\n")
 
 	
 
@@ -302,12 +336,12 @@ def selectUser(s, cursor, irc_msg):
 	cursor.execute("SELECT max(TimeSt), User FROM CompleteChat")
 	max_user = cursor.fetchone()[1]
 	if max_user is not None:
-		send_msg(s, "PRIVMSG "+ irc_msg["channel"]+ " :Last action from user: "+max_user+"\r\n")
+		send_msg(s, "PRIVMSG "+ irc_msg["reciever"]+ " :Last action from user: "+max_user+"\r\n")
 	else:
-		send_msg(s, "PRIVMSG "+ irc_msg["channel"]+ " :Sorry log is empty\r\n")
+		send_msg(s, "PRIVMSG "+ irc_msg["reciever"]+ " :Sorry log is empty\r\n")
 
-def selectLastAction(s, cursor, channel):
-	cursor.execute("SELECT max(TimeSt), User, Message FROM CompleteChat WHERE Channel = '%s'" % channel)
+def selectLastAction(s, cursor, irc_msg):
+	cursor.execute("SELECT max(TimeSt), User, Message FROM CompleteChat WHERE Channel = '%s'" % irc_msg["channel"])
 	#fetchone gives one tuple back
 	result = cursor.fetchone()
 	#if the table is empty fetchone will return None
@@ -316,9 +350,9 @@ def selectLastAction(s, cursor, channel):
 		time = datetime.datetime.fromtimestamp(timestp).strftime("[%Y-%m-%d %H:%M:%S]")
 		user = result[1]
 		message = result[2]
-		send_msg(s, "PRIVMSG "+ channel+ " :" +time +user+message+"\r\n")
+		send_msg(s, "PRIVMSG "+ irc_msg["reciever"]+ " :" +time +user+message+"\r\n")
 	else:
-		send_msg(s, "PRIVMSG "+ channel+ " :Sorry log is empty\r\n")
+		send_msg(s, "PRIVMSG "+ irc_msg["reciever"]+ " :Sorry log is empty\r\n")
 
 def addNewUser(cursor, time, channel, user):
 	cursor.execute("SELECT User FROM AllUsers WHERE User= '%s'" % user)
@@ -327,15 +361,9 @@ def addNewUser(cursor, time, channel, user):
 	if result is not None:
 		update_tableUser(cursor, time, channel, user)
 		print ("User update successful")
-		cursor.execute("SELECT * FROM AllUsers")
-		for row in cursor:
-			print row
 	else:
 		insert_tableUser(cursor, time, channel, user)
 		print ("User insert successful")
-		cursor.execute("SELECT * FROM AllUsers")
-		for row in cursor:
-			print row
 
 def selectLastSeen(s, cursor, user, sender):
 	cursor.execute("SELECT  TimeSt, Channel FROM AllUsers WHERE User = '%s'" % user)
